@@ -8,11 +8,15 @@ from google.auth.transport.requests import Request
 import webbrowser
 import time
 import pytz
+import pyttsx3
+
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 SLEEP_WINDOW_SECS = 60 * 20
 OPEN_MEETING_MINUTES_BEFORE = 3
+speech_engine = pyttsx3.init()
+
 
 def initiate_credentials():
     creds = None
@@ -54,7 +58,8 @@ def get_next_meeting_details():
         meeting_link = event.get('hangoutLink')
         if meeting_link and is_time_in_future(start_time):
             return {'meeting_link': meeting_link,
-                    'start_time': start_time}
+                    'start_time': start_time,
+                    'meeting_name': event.get('summary')}
     return {}
 
 def is_time_in_future(time_to_check):
@@ -70,10 +75,16 @@ def get_secs_till_next_meeting(meeting_start_time):
                datetime.timedelta(minutes=OPEN_MEETING_MINUTES_BEFORE)).seconds
     return SLEEP_WINDOW_SECS + 10
 
+def alert_on_meeting(meeting_name):
+    alert_message = f"{meeting_name} will start in {OPEN_MEETING_MINUTES_BEFORE} minutes"
+    speech_engine.say(alert_message)
+    speech_engine.runAndWait()
+
 def main():
     meeting_should_be_shown_soon = False
     meeting_link = None
     secs_till_next_meeting = SLEEP_WINDOW_SECS + 10
+    meeting_name = ''
 
     while True:
         # showing the next meeting
@@ -81,11 +92,14 @@ def main():
             open_meeting_in_browser(meeting_link)
             meeting_should_be_shown_soon = False
             meeting_link = None
+            alert_on_meeting(meeting_name)
+            meeting_name = ''
         # getting the next meeting
         else:
             meeting_details = get_next_meeting_details()
             meeting_link = meeting_details.get('meeting_link')
             meeting_start_time = meeting_details.get('start_time')
+            meeting_name = meeting_details.get('meeting_name')
             secs_till_next_meeting = get_secs_till_next_meeting(meeting_start_time)
         if SLEEP_WINDOW_SECS > secs_till_next_meeting:
             meeting_should_be_shown_soon = True
